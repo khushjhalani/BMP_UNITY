@@ -120,27 +120,6 @@ public class EnemyIA : MonoBehaviour
     {
         float distanceToPlayer = Vector3.Distance(transform.position, player.position); // Calculate the vector from player to enemy.
         RaycastAtAllTime();
-        /*Vector3 fwd = transform.TransformDirection(Vector3.forward);
-        Vector3 lookingToPlayer = (player.position - transform.position).normalized;
-        float angleToPlayer = Vector3.Angle(lookingToPlayer, transform.forward);
-        
-       
-
-
-        if ((Physics.Raycast(shootingPosition.position, fwd, out RaycastHit hit, detectionRange)) && (angleToPlayer <= ViewAngle * 0.5f))
-            {
-                if (hit.collider.CompareTag("Player"))
-                {
-                    playerDetected = true;
-                    lookingToPlayer.y = 0f;
-                    Quaternion rotation = Quaternion.LookRotation(lookingToPlayer);
-                    transform.rotation = rotation;
-                }
-                else
-                {
-                    playerDetected = false;
-                }
-            }*/
 
         //   ---- Player Distance Range    ----
 
@@ -431,7 +410,7 @@ public class EnemyIA : MonoBehaviour
 
     //   ----- Draw the distance and range of the agent's vision, also where the raycast is pointing  -----
 
-    private void OnDrawGizmos()
+    /*private void OnDrawGizmos()
     {
         if (shootingPosition == null)
         {
@@ -450,5 +429,5 @@ public class EnemyIA : MonoBehaviour
 
         Gizmos.color = Color.green;
         Gizmos.DrawRay(shootingPosition.position, directionToPlayer * detectionRange);
-    }
+    }*/
 }
