@@ -1,0 +1,454 @@
+using System.Collections;
+using System.Collections.Generic;
+using Unity.VisualScripting.FullSerializer;
+using UnityEngine;
+using UnityEngine.AI;
+using UnityEngine.Animations.Rigging;
+
+public class EnemyIA : MonoBehaviour
+{
+    [Header("---------Patrolling----------")]
+
+    private NavMeshAgent navMeshAgent;
+    private Animator animator;
+    public Transform[] patrolPoints; //Location points that the enemy will go through
+    public Transform[] patrolPointsOnAlert; //Location points that the enemy will go through on alert mode
+    private bool isWaiting = false; //If it is false, the enemy can start patrolling and wait at a point
+    public float waitTime = 5.0f;
+    private int currentPatrolPointIndex = 0;
+
+    [Header("-----Patrolling-On-Alert-----")]
+
+    private bool oneTime = false;
+    private bool playerIsClose = false;  // Player is near and the enemy can hear him
+    private bool stayAlert = false;
+    private CharacterAiming playerScriptFire;
+    private int currentPatrolPointIndex2 = 0; //destinations on alert mode
+
+    [Header("---------Detecting-Player----------")]
+
+    public Transform player;
+    private float distanceToPlayer;
+    public float followDistance = 9f; // Distance at which the enemy starts heading towards the player. / Follow distance must be less than shootDistance to pursue
+    public bool isFollowing = false;
+    private CharacterLocomotion playerScript; // It works if the player presses the crouch button
+
+    [Header("---------Raycast----------")]
+    public float hearingRange = 60f; //Distance at which the enemy hears a gunshot and initiates alert mode
+    public float detectionRange = 30f; // Distance at which the enemy's ray notices the player
+    public bool playerDetected = false;
+    public float ViewAngle = 60f; // Vision angle
+
+    private bool obstacleDetected = false;
+
+    [Header("---------Chasing----------")]
+
+    public float chasingDistance = 20f; //Distance the enemy runs and chases the player.
+
+    [Header("---------Shooting----------")]
+
+    int capaDeJugador = 3; //LayerMask
+
+    public Transform shootingPosition; //Empty object from which the detector/trigger ray will exit
+    public float shootingDistance = 10f; // Distance at which the enemy fires at the player.
+    public Rig aimLayer; //  To connect the rigging tool
+    public float aimSpeed = 3; //to control the speed of the weapon's movement in each animation.
+
+    [Header("-------Shooting Damage-------")]
+    
+    public float firingRate = 2.0f;
+    public float damage = 10f; //Damage with each contact raycast-player.
+    private float timeSinceLastShot = 0f;
+
+    //-------------------------------------------------------------------------------------------------------------
+    private void Awake()
+    {
+        navMeshAgent = GetComponent<NavMeshAgent>();
+        animator = GetComponent<Animator>();
+        playerScript = player.GetComponent<CharacterLocomotion>();
+        playerScriptFire = player.GetComponent<CharacterAiming>();
+
+        capaDeJugador = LayerMask.GetMask("Jugador");
+    }
+
+    private void Start()
+    {
+        navMeshAgent.SetDestination(patrolPoints[currentPatrolPointIndex].position);
+        animator.SetBool("isWalking", true);
+    }
+
+    private IEnumerator WaitAndMoveToNextPoint()
+    {
+        isWaiting = true;
+        animator.SetBool("isWalking", false);
+        aimLayer.weight = 0;
+        yield return new WaitForSeconds(waitTime);
+        animator.SetBool("isWalking", true);
+        isWaiting = false;
+        currentPatrolPointIndex = (currentPatrolPointIndex + 1) % patrolPoints.Length;
+        navMeshAgent.speed = 3.0f;
+        navMeshAgent.SetDestination(patrolPoints[currentPatrolPointIndex].position);
+    }
+
+    private IEnumerator WaitAndMoveToNextPointOnAlert()
+    {
+        isWaiting = true;
+
+        animator.SetBool("isCrouchToRun", false);
+        animator.SetBool("isSuspecting", false);
+        animator.SetBool("isWalking", false);
+        aimLayer.weight = 0;
+        yield return new WaitForSeconds(waitTime);
+        animator.SetBool("isSuspecting", true);
+        isWaiting = false;
+        currentPatrolPointIndex2 = (currentPatrolPointIndex2 + 1) % patrolPointsOnAlert.Length;
+        navMeshAgent.speed = 3.5f;
+        navMeshAgent.SetDestination(patrolPointsOnAlert[currentPatrolPointIndex2].position);
+    }
+
+    private IEnumerator FirstAlertMode()
+    {
+        aimLayer.weight = 0.5f;
+        navMeshAgent.speed = 0f;
+        animator.SetBool("isWalking", false);
+        yield return new WaitForSeconds(waitTime);
+        animator.SetBool("isSuspecting", true);
+        navMeshAgent.speed = 3.5f;
+    }
+
+    private void FixedUpdate()
+    {
+        float distanceToPlayer = Vector3.Distance(transform.position, player.position); // Calculate the vector from player to enemy.
+        RaycastAtAllTime();
+        /*Vector3 fwd = transform.TransformDirection(Vector3.forward);
+        Vector3 lookingToPlayer = (player.position - transform.position).normalized;
+        float angleToPlayer = Vector3.Angle(lookingToPlayer, transform.forward);
+        
+       
+
+
+        if ((Physics.Raycast(shootingPosition.position, fwd, out RaycastHit hit, detectionRange)) && (angleToPlayer <= ViewAngle * 0.5f))
+            {
+                if (hit.collider.CompareTag("Player"))
+                {
+                    playerDetected = true;
+                    lookingToPlayer.y = 0f;
+                    Quaternion rotation = Quaternion.LookRotation(lookingToPlayer);
+                    transform.rotation = rotation;
+                }
+                else
+                {
+                    playerDetected = false;
+                }
+            }*/
+
+        //   ---- Player Distance Range    ----
+
+        bool isVeryFar = false;
+        bool isfar = false;
+        bool detectionZone = false;
+        bool chasingZone = false;
+        bool firingZone = false;
+
+        if (distanceToPlayer <= hearingRange) isVeryFar = true;
+        if (distanceToPlayer >= detectionRange) isfar = true; // The player is beyond detection
+        if (distanceToPlayer <= detectionRange && distanceToPlayer >= chasingDistance) detectionZone = true; // The enemy suspects the player's presence
+        if (distanceToPlayer <= chasingDistance && distanceToPlayer >= shootingDistance) chasingZone = true; // The enemy follows the player to shoot him
+        if (distanceToPlayer <= shootingDistance) firingZone = true; // The enemy shoots the player
+
+        if ((isVeryFar == true && playerScriptFire.PlayerShoot == true) || stayAlert == true)
+        {
+            if (!oneTime)
+            {
+                StartCoroutine(FirstAlertMode());
+                oneTime = true;
+            }  
+
+            if (isfar == true)
+            {
+                if ((playerScript.isCrouching == true && (!playerDetected || playerDetected)) || (playerScript.isCrouching == false && (!playerDetected || playerDetected)))
+                {
+                    playerIsClose = true;
+                    PatrolingOnAlert();
+                    isFollowing = false;
+                }
+            }
+
+            if (detectionZone == true)
+            {
+                if (playerScript.isCrouching == true && !playerDetected)
+                {
+                    PatrolingOnAlert();
+                }
+                if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || !playerDetected && playerScript.isCrouching == false)
+                {
+                    playerIsClose = true;
+                    DetectingThePlayer();
+                    isFollowing = true;
+                    Debug.Log("AAAAA");
+                }
+            }
+            if (chasingZone == true)
+            {
+                if (playerScript.isCrouching == true && !playerDetected)
+                {
+                    PatrolingOnAlert();
+                }
+                else if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || !playerDetected && playerScript.isCrouching == false)
+                {
+                    playerIsClose = true;
+                    ChasingThePlayer();
+                    isFollowing = true;
+                    Debug.Log("BBBB");
+                }
+            }
+            if (firingZone == true)
+            {
+                if ((playerScript.isCrouching == true && !playerDetected) || (!playerDetected && playerScript.isCrouching == false && obstacleDetected == true))
+                {
+                        PatrolingOnAlert();
+                        isFollowing = false;
+                        Debug.Log("3333");
+                }
+                else if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || (!playerDetected && playerScript.isCrouching == false && obstacleDetected == false))
+                {
+                    playerIsClose = true;
+                    ShootingThePlayer();
+                    Debug.Log("1111");
+                }
+            }
+        }
+        else
+        {
+            if (playerIsClose == true)
+            {
+                stayAlert = true;
+            }
+                if (isfar == true)
+                {
+                    if ((playerScript.isCrouching == true && (!playerDetected || playerDetected)) || (playerScript.isCrouching == false && (!playerDetected || playerDetected)))
+                    {
+                        Patroling();
+                        isFollowing = false;
+                    }
+                }
+                if (detectionZone == true)
+                {
+                    if (playerScript.isCrouching == true && !playerDetected)
+                    {
+                        Patroling();
+                    }
+                    if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || !playerDetected && playerScript.isCrouching == false)
+                    {
+                        playerIsClose = true;
+                        DetectingThePlayer();
+                        isFollowing = true;
+                        Debug.Log("Que paso");
+                    }
+                }
+                if (chasingZone == true)
+                {
+                    if (playerScript.isCrouching == true && !playerDetected)
+                    {
+                        Patroling();
+                    }
+                    else if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || !playerDetected && playerScript.isCrouching == false)
+                    {
+                        playerIsClose = true;
+                        ChasingThePlayer();
+                        isFollowing = true;
+                        Debug.Log("Que paso aca");
+                    }
+                }
+                if (firingZone == true)
+                {
+                    if (playerScript.isCrouching == true && !playerDetected)
+                    {
+                        Patroling();
+                        Debug.Log("3.55555");
+                    }
+
+                    else if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || !playerDetected && playerScript.isCrouching == false)
+                    {
+                        playerIsClose = true;
+                        ShootingThePlayer();
+                        Debug.Log("2222");
+                    }
+            }
+            
+            playerScriptFire.PlayerShoot = false;
+        }
+
+        // ----  Control structure to follow player -----
+
+        if (distanceToPlayer >= followDistance && distanceToPlayer <= detectionRange && isFollowing == true)
+        {
+            Vector3 directionToPlayer = player.position - transform.position;
+            Vector3 targetPosition = player.position - directionToPlayer.normalized * followDistance;
+            navMeshAgent.SetDestination(targetPosition);  
+        }
+
+        timeSinceLastShot += Time.deltaTime;
+        if (timeSinceLastShot >= firingRate && aimLayer.weight == 1.0f)
+        {
+            timeSinceLastShot = 0f;
+            RaycastThePlayer();
+        }
+        
+    }
+
+    private void RaycastAtAllTime()
+    {
+
+        if (distanceToPlayer <= detectionRange)
+        {
+            Vector3 directionToPlayer = (player.position - transform.position).normalized;
+            float angleToPlayer = Vector3.Angle(directionToPlayer, transform.forward);
+
+            if (angleToPlayer <= ViewAngle * 0.5f)
+            {
+                if (Physics.Raycast(shootingPosition.position, directionToPlayer, out RaycastHit hit, detectionRange))
+                {
+                    Debug.DrawRay(shootingPosition.position, directionToPlayer * detectionRange, Color.green);
+                    if (hit.collider.CompareTag("Player"))
+                    {
+                        playerDetected = true;
+                        //playerVisible = true;
+                    }
+                    if (hit.collider.CompareTag("Obstacle"))
+                    {
+                        obstacleDetected = true;
+                        //playerVisible = true;
+                    }
+                    else
+                    {
+                        playerDetected = false;
+                        obstacleDetected = false;
+                    }
+                }
+            }
+        }
+        /*if (!playerDetected)
+        {
+            playerDetected = false;
+            animator.SetBool("isShooting", false);
+        }*/
+    }
+
+    private void RaycastThePlayer()
+    {
+
+        if (distanceToPlayer <= detectionRange)
+        {
+            Vector3 directionToPlayer = (player.position - transform.position).normalized;
+            float angleToPlayer = Vector3.Angle(directionToPlayer, transform.forward);
+
+            if (angleToPlayer <= ViewAngle * 0.5f)
+            {
+                if (Physics.Raycast(shootingPosition.position, directionToPlayer, out RaycastHit hit, detectionRange))
+                {
+                    Debug.DrawRay(shootingPosition.position, directionToPlayer * detectionRange, Color.green);
+                    if (hit.collider.CompareTag("Player"))
+                    {
+                        playerDetected = true;
+                        Debug.Log("Daño al Jugador");
+                        PlayerLife target = hit.transform.GetComponent<PlayerLife>();
+                        if (target != null)
+                        {
+                            target.TakeDamage(damage);
+
+                        }
+                    }
+                    else
+                    {
+                        playerDetected = false;
+                    }
+                }
+            }
+        }
+        /*if (!playerDetected)
+        {
+            playerDetected = false;
+            animator.SetBool("isShooting", false);
+        }*/
+    }
+
+    
+
+    private void Patroling()
+    {
+        if (!navMeshAgent.pathPending && navMeshAgent.remainingDistance < 0.5f && !isWaiting)
+        {
+            StartCoroutine(WaitAndMoveToNextPoint());
+        }
+    }
+
+    private void PatrolingOnAlert()
+    {
+        if (!navMeshAgent.pathPending && navMeshAgent.remainingDistance < 0.5f && !isWaiting)
+        {
+            StartCoroutine(WaitAndMoveToNextPointOnAlert());
+        }
+    }
+
+    private void DetectingThePlayer()
+    {
+        animator.SetBool("isSuspecting", true);
+        animator.SetBool("isCrouchToRun", false);
+        navMeshAgent.speed = 4f;
+        aimLayer.weight -= Time.deltaTime * aimSpeed;
+    }
+
+    private void ChasingThePlayer()
+    {
+        animator.SetBool("isSuspecting", true);
+        animator.SetBool("isCrouchToRun", true);
+        animator.SetBool("isRuntoShoot", false);
+        navMeshAgent.speed = 7.0f;
+
+        if (aimLayer.weight > 0.5)
+        {
+            aimLayer.weight -= Time.deltaTime * aimSpeed;
+        }
+        else if (aimLayer.weight < 0.5)
+        {
+            aimLayer.weight += Time.deltaTime * aimSpeed;
+        }
+    }
+
+    private void ShootingThePlayer()
+    {
+        animator.SetBool("isShooting", true);
+        aimLayer.weight += Time.deltaTime * aimSpeed;
+        navMeshAgent.SetDestination(transform.position);
+        Vector3 directionToPlayer2 = player.position - transform.position;
+        directionToPlayer2.y = 0f;
+        Quaternion rotation = Quaternion.LookRotation(directionToPlayer2);
+        transform.rotation = rotation;
+        animator.SetBool("isRuntoShoot", true);
+        Debug.Log("Shooting the Player");
+    }
+
+    //   ----- Draw the distance and range of the agent's vision, also where the raycast is pointing  -----
+
+    private void OnDrawGizmos()
+    {
+        if (shootingPosition == null)
+        {
+            return;
+        }
+        Vector3 directionToPlayer = (player.position - shootingPosition.position).normalized;
+        float halfFieldOfView = ViewAngle * 0.5f;
+        Quaternion leftRayRotation = Quaternion.AngleAxis(-halfFieldOfView, Vector3.up);
+        Quaternion rightRayRotation = Quaternion.AngleAxis(halfFieldOfView, Vector3.up);
+        Vector3 leftRayDirection = leftRayRotation * directionToPlayer;
+        Vector3 rightRayDirection = rightRayRotation * directionToPlayer;
+
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawRay(shootingPosition.position, leftRayDirection * detectionRange);
+        Gizmos.DrawRay(shootingPosition.position, rightRayDirection * detectionRange);
+
+        Gizmos.color = Color.green;
+        Gizmos.DrawRay(shootingPosition.position, directionToPlayer * detectionRange);
+    }
+}
