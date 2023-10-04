@@ -47,8 +47,6 @@ public class EnemyIA : MonoBehaviour
 
     [Header("---------Shooting----------")]
 
-    int capaDeJugador = 3; //LayerMask
-
     public Transform shootingPosition; //Empty object from which the detector/trigger ray will exit
     public float shootingDistance = 10f; // Distance at which the enemy fires at the player.
     public Rig aimLayer; //  To connect the rigging tool
@@ -67,8 +65,6 @@ public class EnemyIA : MonoBehaviour
         animator = GetComponent<Animator>();
         playerScript = player.GetComponent<CharacterLocomotion>();
         playerScriptFire = player.GetComponent<CharacterAiming>();
-
-        capaDeJugador = LayerMask.GetMask("Jugador");
     }
 
     private void Start()
@@ -93,7 +89,6 @@ public class EnemyIA : MonoBehaviour
     private IEnumerator WaitAndMoveToNextPointOnAlert()
     {
         isWaiting = true;
-
         animator.SetBool("isCrouchToRun", false);
         animator.SetBool("isSuspecting", false);
         animator.SetBool("isWalking", false);
@@ -118,10 +113,10 @@ public class EnemyIA : MonoBehaviour
 
     private void FixedUpdate()
     {
-        float distanceToPlayer = Vector3.Distance(transform.position, player.position); // Calculate the vector from player to enemy.
-        RaycastAtAllTime();
+        float distanceToPlayer = Vector3.Distance(transform.position, player.position); // Calculate the vector from player to enemy in each frame.
+        RaycastAtAllTime(); // Recognize the object that collides with the raycast in each frame.
 
-        //   ---- Player Distance Range    ----
+        //   ---- Player Distance Range (behave)  ----
 
         bool isVeryFar = false;
         bool isfar = false;
@@ -152,7 +147,6 @@ public class EnemyIA : MonoBehaviour
                     isFollowing = false;
                 }
             }
-
             if (detectionZone == true)
             {
                 if (playerScript.isCrouching == true && !playerDetected)
@@ -164,7 +158,6 @@ public class EnemyIA : MonoBehaviour
                     playerIsClose = true;
                     DetectingThePlayer();
                     isFollowing = true;
-                    Debug.Log("AAAAA");
                 }
             }
             if (chasingZone == true)
@@ -178,7 +171,6 @@ public class EnemyIA : MonoBehaviour
                     playerIsClose = true;
                     ChasingThePlayer();
                     isFollowing = true;
-                    Debug.Log("BBBB");
                 }
             }
             if (firingZone == true)
@@ -187,13 +179,11 @@ public class EnemyIA : MonoBehaviour
                 {
                         PatrolingOnAlert();
                         isFollowing = false;
-                        Debug.Log("3333");
                 }
                 else if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || (!playerDetected && playerScript.isCrouching == false && obstacleDetected == false))
                 {
                     playerIsClose = true;
                     ShootingThePlayer();
-                    Debug.Log("1111");
                 }
             }
         }
@@ -222,7 +212,6 @@ public class EnemyIA : MonoBehaviour
                         playerIsClose = true;
                         DetectingThePlayer();
                         isFollowing = true;
-                        Debug.Log("Que paso");
                     }
                 }
                 if (chasingZone == true)
@@ -236,7 +225,6 @@ public class EnemyIA : MonoBehaviour
                         playerIsClose = true;
                         ChasingThePlayer();
                         isFollowing = true;
-                        Debug.Log("Que paso aca");
                     }
                 }
                 if (firingZone == true)
@@ -244,17 +232,13 @@ public class EnemyIA : MonoBehaviour
                     if (playerScript.isCrouching == true && !playerDetected)
                     {
                         Patroling();
-                        Debug.Log("3.55555");
                     }
-
                     else if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || !playerDetected && playerScript.isCrouching == false)
                     {
                         playerIsClose = true;
                         ShootingThePlayer();
-                        Debug.Log("2222");
                     }
             }
-            
             playerScriptFire.PlayerShoot = false;
         }
 
@@ -267,18 +251,18 @@ public class EnemyIA : MonoBehaviour
             navMeshAgent.SetDestination(targetPosition);  
         }
 
+        // ----  Control the firing rate -----
+
         timeSinceLastShot += Time.deltaTime;
         if (timeSinceLastShot >= firingRate && aimLayer.weight == 1.0f)
         {
             timeSinceLastShot = 0f;
             RaycastThePlayer();
         }
-        
     }
 
     private void RaycastAtAllTime()
     {
-
         if (distanceToPlayer <= detectionRange)
         {
             Vector3 directionToPlayer = (player.position - transform.position).normalized;
@@ -307,21 +291,14 @@ public class EnemyIA : MonoBehaviour
                 }
             }
         }
-        /*if (!playerDetected)
-        {
-            playerDetected = false;
-            animator.SetBool("isShooting", false);
-        }*/
     }
 
     private void RaycastThePlayer()
     {
-
         if (distanceToPlayer <= detectionRange)
         {
             Vector3 directionToPlayer = (player.position - transform.position).normalized;
             float angleToPlayer = Vector3.Angle(directionToPlayer, transform.forward);
-
             if (angleToPlayer <= ViewAngle * 0.5f)
             {
                 if (Physics.Raycast(shootingPosition.position, directionToPlayer, out RaycastHit hit, detectionRange))
@@ -335,7 +312,6 @@ public class EnemyIA : MonoBehaviour
                         if (target != null)
                         {
                             target.TakeDamage(damage);
-
                         }
                     }
                     else
@@ -345,11 +321,6 @@ public class EnemyIA : MonoBehaviour
                 }
             }
         }
-        /*if (!playerDetected)
-        {
-            playerDetected = false;
-            animator.SetBool("isShooting", false);
-        }*/
     }
 
     
@@ -405,7 +376,6 @@ public class EnemyIA : MonoBehaviour
         Quaternion rotation = Quaternion.LookRotation(directionToPlayer2);
         transform.rotation = rotation;
         animator.SetBool("isRuntoShoot", true);
-        Debug.Log("Shooting the Player");
     }
 
     //   ----- Draw the distance and range of the agent's vision, also where the raycast is pointing  -----
