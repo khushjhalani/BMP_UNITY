@@ -4,6 +4,7 @@ using UnityEngine;
 public class PlayerGun : MonoBehaviour
 {
     public float damage = 10f;
+    public float damageTower = 1f;
     public float range = 100f;
 
     //public Transform muzzle;
@@ -62,7 +63,11 @@ public class PlayerGun : MonoBehaviour
                 {
                     target.TakeDamage(damage);
                 }
-                
+                EnemyLifeTower target2 = hit.transform.GetComponent<EnemyLifeTower>();
+                if (target2 != null)
+                {
+                    target2.TakeDamage(damageTower);
+                }
             }
         }
     }

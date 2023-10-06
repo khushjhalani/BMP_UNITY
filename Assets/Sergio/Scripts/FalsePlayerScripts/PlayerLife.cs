@@ -5,13 +5,15 @@ using UnityEngine.AI;
 
 public class PlayerLife : MonoBehaviour
 {
-    private Animator animator;
+    private CapsuleCollider collider;
 
     public float health = 2000f;
 
+    public int ammo = 0;
+
     void Awake()
     {
-        animator = GetComponent<Animator>();
+        collider = GetComponent<CapsuleCollider>();
     }
     public void TakeDamage(float amount)
     {
@@ -25,7 +27,13 @@ public class PlayerLife : MonoBehaviour
 
     void Die()
     {
-        animator.SetBool("Death", true);
+        collider.enabled = false;
         Debug.Log("Player Murio");
+    }
+
+    public void CollectMagazine()
+    {
+        ammo += 30; // Aumenta el número de balas cuando se recoge el cargador.
+        Debug.Log("cantidad balas =" + ammo);
     }
 }
