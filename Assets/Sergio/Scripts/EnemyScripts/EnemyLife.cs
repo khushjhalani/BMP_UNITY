@@ -19,10 +19,13 @@ public class EnemyLife : MonoBehaviour
 
     public void TakeDamage (float amount)
     {
-        health -= amount;
-        if (health <= 0)
+        if (health > 0)
         {
-            Die();
+            health -= amount;
+            if (health <= 0)
+            {
+                Die();
+            }
         }
     }
 

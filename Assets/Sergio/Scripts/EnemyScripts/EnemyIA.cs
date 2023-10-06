@@ -22,7 +22,7 @@ public class EnemyIA : MonoBehaviour
     private bool oneTime = false;
     private bool playerIsClose = false;  // Player is near and the enemy can hear him
     private bool stayAlert = false;
-    private CharacterAiming playerScriptFire;
+    private WeaponManager playerScriptFire;
     private int currentPatrolPointIndex2 = 0; //destinations on alert mode
 
     [Header("---------Detecting-Player----------")]
@@ -31,7 +31,7 @@ public class EnemyIA : MonoBehaviour
     private float distanceToPlayer;
     public float followDistance = 9f; // Distance at which the enemy starts heading towards the player. / Follow distance must be less than shootDistance to pursue
     public bool isFollowing = false;
-    private CharacterLocomotion playerScript; // It works if the player presses the crouch button
+    private MovementStateManager playerScript; // It works if the player presses the crouch button
 
     [Header("---------Raycast----------")]
     public float hearingRange = 60f; //Distance at which the enemy hears a gunshot and initiates alert mode
@@ -63,8 +63,8 @@ public class EnemyIA : MonoBehaviour
     {
         navMeshAgent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
-        playerScript = player.GetComponent<CharacterLocomotion>();
-        playerScriptFire = player.GetComponent<CharacterAiming>();
+        playerScript = player.GetComponent<MovementStateManager>();
+        playerScriptFire = player.GetComponentInChildren<WeaponManager>();
     }
 
     private void Start()
@@ -130,7 +130,7 @@ public class EnemyIA : MonoBehaviour
         if (distanceToPlayer <= chasingDistance && distanceToPlayer >= shootingDistance) chasingZone = true; // The enemy follows the player to shoot him
         if (distanceToPlayer <= shootingDistance) firingZone = true; // The enemy shoots the player
 
-        if ((isVeryFar == true && playerScriptFire.PlayerShoot == true) || stayAlert == true)
+        if ((isVeryFar == true && playerScriptFire.playerShooting == true) || stayAlert == true)
         {
             if (!oneTime)
             {
@@ -140,7 +140,7 @@ public class EnemyIA : MonoBehaviour
 
             if (isfar == true)
             {
-                if ((playerScript.isCrouching == true && (!playerDetected || playerDetected)) || (playerScript.isCrouching == false && (!playerDetected || playerDetected)))
+                if ((playerScript.currentState == playerScript.Crouch && (!playerDetected || playerDetected)) || (playerScript.currentState != playerScript.Crouch && (!playerDetected || playerDetected)))
                 {
                     playerIsClose = true;
                     PatrolingOnAlert();
@@ -149,11 +149,11 @@ public class EnemyIA : MonoBehaviour
             }
             if (detectionZone == true)
             {
-                if (playerScript.isCrouching == true && !playerDetected)
+                if (playerScript.currentState == playerScript.Crouch && !playerDetected)
                 {
                     PatrolingOnAlert();
                 }
-                if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || !playerDetected && playerScript.isCrouching == false)
+                if ((playerDetected && (playerScript.currentState == playerScript.Crouch || playerScript.currentState != playerScript.Crouch)) || !playerDetected && playerScript.currentState != playerScript.Crouch)
                 {
                     playerIsClose = true;
                     DetectingThePlayer();
@@ -162,11 +162,11 @@ public class EnemyIA : MonoBehaviour
             }
             if (chasingZone == true)
             {
-                if (playerScript.isCrouching == true && !playerDetected)
+                if (playerScript.currentState == playerScript.Crouch && !playerDetected)
                 {
                     PatrolingOnAlert();
                 }
-                else if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || !playerDetected && playerScript.isCrouching == false)
+                else if ((playerDetected && (playerScript.currentState == playerScript.Crouch || playerScript.currentState != playerScript.Crouch)) || !playerDetected && playerScript.currentState != playerScript.Crouch)
                 {
                     playerIsClose = true;
                     ChasingThePlayer();
@@ -175,12 +175,12 @@ public class EnemyIA : MonoBehaviour
             }
             if (firingZone == true)
             {
-                if ((playerScript.isCrouching == true && !playerDetected) || (!playerDetected && playerScript.isCrouching == false && obstacleDetected == true))
+                if ((playerScript.currentState == playerScript.Crouch && !playerDetected) || (!playerDetected && playerScript.currentState != playerScript.Crouch && obstacleDetected == true))
                 {
                         PatrolingOnAlert();
                         isFollowing = false;
                 }
-                else if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || (!playerDetected && playerScript.isCrouching == false && obstacleDetected == false))
+                else if ((playerDetected && (playerScript.currentState == playerScript.Crouch || playerScript.currentState != playerScript.Crouch)) || (!playerDetected && playerScript.currentState != playerScript.Crouch && obstacleDetected == false))
                 {
                     playerIsClose = true;
                     ShootingThePlayer();
@@ -195,7 +195,7 @@ public class EnemyIA : MonoBehaviour
             }
                 if (isfar == true)
                 {
-                    if ((playerScript.isCrouching == true && (!playerDetected || playerDetected)) || (playerScript.isCrouching == false && (!playerDetected || playerDetected)))
+                    if ((playerScript.currentState == playerScript.Crouch && (!playerDetected || playerDetected)) || (playerScript.currentState != playerScript.Crouch && (!playerDetected || playerDetected)))
                     {
                         Patroling();
                         isFollowing = false;
@@ -203,11 +203,11 @@ public class EnemyIA : MonoBehaviour
                 }
                 if (detectionZone == true)
                 {
-                    if (playerScript.isCrouching == true && !playerDetected)
+                    if (playerScript.currentState == playerScript.Crouch && !playerDetected)
                     {
                         Patroling();
                     }
-                    if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || !playerDetected && playerScript.isCrouching == false)
+                    if ((playerDetected && (playerScript.currentState == playerScript.Crouch || playerScript.currentState != playerScript.Crouch)) || !playerDetected && playerScript.currentState != playerScript.Crouch)
                     {
                         playerIsClose = true;
                         DetectingThePlayer();
@@ -216,11 +216,11 @@ public class EnemyIA : MonoBehaviour
                 }
                 if (chasingZone == true)
                 {
-                    if (playerScript.isCrouching == true && !playerDetected)
+                    if (playerScript.currentState == playerScript.Crouch && !playerDetected)
                     {
                         Patroling();
                     }
-                    else if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || !playerDetected && playerScript.isCrouching == false)
+                    else if ((playerDetected && (playerScript.currentState == playerScript.Crouch || playerScript.currentState != playerScript.Crouch)) || !playerDetected && playerScript.currentState != playerScript.Crouch)
                     {
                         playerIsClose = true;
                         ChasingThePlayer();
@@ -229,17 +229,17 @@ public class EnemyIA : MonoBehaviour
                 }
                 if (firingZone == true)
                 {
-                    if (playerScript.isCrouching == true && !playerDetected)
+                    if (playerScript.currentState == playerScript.Crouch && !playerDetected)
                     {
                         Patroling();
                     }
-                    else if ((playerDetected && (playerScript.isCrouching == true || playerScript.isCrouching == false)) || !playerDetected && playerScript.isCrouching == false)
+                    else if ((playerDetected && (playerScript.currentState == playerScript.Crouch || playerScript.currentState != playerScript.Crouch)) || !playerDetected && playerScript.currentState != playerScript.Crouch)
                     {
                         playerIsClose = true;
                         ShootingThePlayer();
                     }
             }
-            playerScriptFire.PlayerShoot = false;
+            playerScriptFire.playerShooting = false;
         }
 
         // ----  Control structure to follow player -----

@@ -7,12 +7,9 @@ using UnityEngine.InputSystem;
 public class StartBtn : MonoBehaviour
 {
    
-   /** private void Start()
+   public void PlayButton()
     {
-        if (TouchPressControl.OnTouchDetected)
-        {
-            SceneManager.LoadScene("Lath");
-        }
+       SceneManager.LoadScene("Triple Frontier Test");
     }
-   **/
+   
 }

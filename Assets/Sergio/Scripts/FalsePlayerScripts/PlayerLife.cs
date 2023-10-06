@@ -5,13 +5,13 @@ using UnityEngine.AI;
 
 public class PlayerLife : MonoBehaviour
 {
-    private CapsuleCollider collider;
+    private Animator animator;
 
     public float health = 2000f;
 
     void Awake()
     {
-        collider = GetComponent<CapsuleCollider>();
+        animator = GetComponent<Animator>();
     }
     public void TakeDamage(float amount)
     {
@@ -25,7 +25,7 @@ public class PlayerLife : MonoBehaviour
 
     void Die()
     {
-        collider.enabled = false;
+        animator.SetBool("Death", true);
         Debug.Log("Player Murio");
     }
 }
